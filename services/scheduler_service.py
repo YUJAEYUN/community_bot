@@ -11,6 +11,7 @@ import random
 
 from config import settings
 from services.llm_service import llm_service
+from services.external_api_service import external_api_service, ArticleType
 from utils.random_generator import generate_comment_signature, generate_post_signature, get_random_interval_minutes
 
 # 로깅 설정
@@ -43,13 +44,26 @@ class SchedulerService:
             self.scheduler.start()
             self.is_running = True
             logger.info("스케줄러가 시작되었습니다.")
-    
+
     def stop(self):
         """스케줄러 중지"""
         if self.is_running:
             self.scheduler.shutdown()
             self.is_running = False
             logger.info("스케줄러가 중지되었습니다.")
+
+    def restart(self):
+        """스케줄러 재시작 (새로운 설정 적용)"""
+        # 기존 스케줄러 중지
+        if self.is_running:
+            self.stop()
+
+        # 새 스케줄러 인스턴스 생성
+        self.scheduler = AsyncIOScheduler()
+        self.is_running = False
+
+        # 새로운 설정으로 시작
+        self.start()
     
     def _schedule_next_comment(self):
         """다음 댓글 생성 스케줄링"""
@@ -73,11 +87,10 @@ class SchedulerService:
     
     def _schedule_next_post(self):
         """다음 게시글 생성 스케줄링"""
-        # 랜덤 간격 계산 (24시간 ~ 72시간)
-        interval_minutes = get_random_interval_minutes(
-            settings.POST_MIN_INTERVAL_HOURS * 60,
-            settings.POST_MAX_INTERVAL_HOURS
-        )
+        # 랜덤 간격 계산 (10분 ~ 2시간)
+        min_minutes = 10  # 10분
+        max_minutes = settings.POST_MAX_INTERVAL_HOURS * 60  # 2시간 = 120분
+        interval_minutes = random.randint(min_minutes, max_minutes)
         
         run_time = datetime.now() + timedelta(minutes=interval_minutes)
         
@@ -94,27 +107,52 @@ class SchedulerService:
     async def _generate_auto_comment(self):
         """자동 댓글 생성 및 전송"""
         try:
-            # 샘플 피드 중 랜덤 선택 (실제로는 외부 API에서 최신 피드 가져옴)
-            feed_content = random.choice(self.sample_feeds)
-            
-            # 감성 분석
+            # 1. 최근 게시글 목록 가져오기
+            recent_articles = await external_api_service.get_recent_articles("general", 5)
+
+            if not recent_articles:
+                logger.warning("최근 게시글을 가져올 수 없어 샘플 피드를 사용합니다.")
+                # 샘플 피드 사용
+                feed_content = random.choice(self.sample_feeds)
+                article_id = "sample_article_id"
+            else:
+                # 랜덤하게 게시글 선택
+                selected_article = random.choice(recent_articles)
+                feed_content = selected_article.get('content', '')
+                article_id = selected_article.get('id', '')
+
+                if not feed_content:
+                    logger.warning("선택된 게시글에 내용이 없어 샘플 피드를 사용합니다.")
+                    feed_content = random.choice(self.sample_feeds)
+                    article_id = "sample_article_id"
+
+            # 2. 감성 분석
             sentiment_result = await llm_service.analyze_sentiment(feed_content)
-            
+
             if sentiment_result.is_positive:
-                # 긍정적인 피드에만 댓글 생성
+                # 3. 긍정적인 피드에만 댓글 생성
                 comment = await llm_service.generate_comment(feed_content)
-                comment_with_signature = generate_comment_signature(comment)
-                
-                # 외부 API로 댓글 전송 (실제 구현 필요)
-                await self._send_comment_to_external_api(feed_content, comment_with_signature)
-                
-                logger.info(f"자동 댓글 생성 완료: {comment_with_signature}")
+
+                # 서명 제거 (외부 API에서는 순수 댓글 내용만 전송)
+                clean_comment = comment.strip()
+
+                # 4. 외부 API로 댓글 전송
+                result = await external_api_service.create_comment(
+                    article_id=article_id,
+                    content=clean_comment,
+                    anonymous=True
+                )
+
+                if result:
+                    logger.info(f"자동 댓글 생성 완료 - 게시글 ID: {article_id}, 댓글: {clean_comment}")
+                else:
+                    logger.error(f"댓글 전송 실패 - 게시글 ID: {article_id}")
             else:
                 logger.info(f"부정적인 피드로 판단되어 댓글을 생성하지 않습니다: {sentiment_result.reason}")
-            
-            # 다음 댓글 스케줄링
+
+            # 5. 다음 댓글 스케줄링
             self._schedule_next_comment()
-            
+
         except Exception as e:
             logger.error(f"자동 댓글 생성 중 오류 발생: {str(e)}")
             # 오류 발생 시에도 다음 스케줄 예약
@@ -123,36 +161,49 @@ class SchedulerService:
     async def _generate_auto_post(self):
         """자동 게시글 생성 및 전송"""
         try:
-            # 게시글 생성
-            title, content = await llm_service.generate_post()
-            post_signature = generate_post_signature()
-            
-            full_content = f"{content}\n\n{post_signature}"
-            
-            # 외부 API로 게시글 전송 (실제 구현 필요)
-            await self._send_post_to_external_api(title, full_content)
-            
-            logger.info(f"자동 게시글 생성 완료: {title}")
-            
-            # 다음 게시글 스케줄링
+            # 1. 랜덤하게 게시글 타입 선택
+            article_type = self._get_random_article_type()
+
+            # 2. 선택된 타입에 맞는 게시글 생성
+            title, content = await llm_service.generate_post(article_type=article_type.value)
+
+            # 3. 외부 API로 게시글 전송 (anonymous는 항상 True)
+            result = await external_api_service.create_article(
+                title=title,
+                content=content,
+                article_type=article_type,
+                anonymous=True
+            )
+
+            if result:
+                logger.info(f"자동 게시글 생성 완료 - 타입: {article_type.value}, 제목: {title}, ID: {result.get('id')}")
+            else:
+                logger.error(f"게시글 전송 실패 - 타입: {article_type.value}, 제목: {title}")
+
+            # 4. 다음 게시글 스케줄링
             self._schedule_next_post()
-            
+
         except Exception as e:
             logger.error(f"자동 게시글 생성 중 오류 발생: {str(e)}")
             # 오류 발생 시에도 다음 스케줄 예약
             self._schedule_next_post()
+
+    def _get_random_article_type(self) -> ArticleType:
+        """
+        랜덤하게 게시글 타입을 선택합니다.
+
+        Returns:
+            ArticleType: 랜덤 선택된 게시글 타입
+        """
+        # 3개 카테고리 중 랜덤 선택
+        article_types = [
+            ArticleType.GENERAL,      # 실시간
+            ArticleType.REVIEW,       # 리뷰
+            ArticleType.LOVE_CONCERNS # 연애상담
+        ]
+        return random.choice(article_types)
     
-    async def _send_comment_to_external_api(self, feed_content: str, comment: str):
-        """외부 API로 댓글 전송 (구현 필요)"""
-        # TODO: 실제 외부 서비스 API 연동 구현
-        logger.info(f"외부 API로 댓글 전송: {comment}")
-        pass
-    
-    async def _send_post_to_external_api(self, title: str, content: str):
-        """외부 API로 게시글 전송 (구현 필요)"""
-        # TODO: 실제 외부 서비스 API 연동 구현
-        logger.info(f"외부 API로 게시글 전송: {title}")
-        pass
+
     
     def get_status(self):
         """스케줄러 상태 반환"""

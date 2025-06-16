@@ -8,9 +8,13 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 from typing import Tuple, Optional
 import json
+import logging
 
 from config import settings
 from models.schemas import SentimentAnalysisResult
+
+# 로깅 설정
+logger = logging.getLogger(__name__)
 
 class LLMService:
     """LLM 서비스 클래스"""
@@ -37,31 +41,29 @@ class LLMService:
 
         # 감성 분석 프롬프트
         self.sentiment_prompt = ChatPromptTemplate.from_messages([
-            SystemMessage(content="""
-            당신은 소개팅 앱 커뮤니티의 피드 내용을 분석하는 전문가입니다.
-            주어진 피드가 긍정적인지 부정적인지 판단해주세요.
+            ("system", """당신은 소개팅 앱 커뮤니티의 피드 내용을 분석하는 전문가입니다.
+주어진 피드가 긍정적인지 부정적인지 판단해주세요.
 
-            다음과 같은 내용은 부정적으로 분류해야 합니다:
-            - 매칭이 안 된다는 불만
-            - 외모 비하나 차별적 표현
-            - 서비스에 대한 강한 불만이나 비판
-            - 극도로 우울하거나 절망적인 내용
-            - 타인을 비난하거나 공격하는 내용
+다음과 같은 내용은 부정적으로 분류해야 합니다:
+- 매칭이 안 된다는 불만
+- 외모 비하나 차별적 표현
+- 서비스에 대한 강한 불만이나 비판
+- 극도로 우울하거나 절망적인 내용
+- 타인을 비난하거나 공격하는 내용
 
-            긍정적인 내용:
-            - 일상적인 이야기나 경험 공유
-            - 연애나 만남에 대한 희망적인 내용
-            - 취미나 관심사에 대한 이야기
-            - 질문이나 조언 요청
+긍정적인 내용:
+- 일상적인 이야기나 경험 공유
+- 연애나 만남에 대한 희망적인 내용
+- 취미나 관심사에 대한 이야기
+- 질문이나 조언 요청
 
-            응답은 다음 JSON 형식으로 해주세요:
-            {
-                "is_positive": true/false,
-                "confidence": 0.0-1.0,
-                "reason": "판단 근거"
-            }
-            """),
-            HumanMessage(content="분석할 피드 내용: {feed_content}")
+응답은 반드시 다음 JSON 형식으로만 해주세요:
+{{
+    "is_positive": true,
+    "confidence": 0.9,
+    "reason": "판단 근거"
+}}"""),
+            ("human", "분석할 피드 내용: {feed_content}")
         ])
 
         self.sentiment_chain = self.sentiment_prompt | self.llm
@@ -89,30 +91,41 @@ class LLMService:
 
         self.comment_chain = self.comment_prompt | self.llm
         
-        # 게시글 생성 프롬프트
+        # 게시글 생성 프롬프트 (실제 대학생 스타일로 특화)
         self.post_prompt = ChatPromptTemplate.from_messages([
-            SystemMessage(content="""
-            당신은 소개팅 앱 커뮤니티를 활성화시키는 역할을 합니다.
-            사용자들이 관심을 가지고 참여할 만한 가벼운 질문이나 흥미로운 주제의 게시글을 작성해주세요.
+            ("system", """당신은 20대 대학생이 되어 소개팅 앱 커뮤니티에 자연스러운 게시글을 작성합니다.
+실제 대학생들이 쓸 법한 진짜 같은 게시글을 만들어주세요.
 
-            게시글 주제:
-            - 연애와 관련된 가벼운 질문
-            - 일상생활 경험 공유
-            - 취미나 관심사에 대한 이야기
-            - 계절이나 시기에 맞는 주제
-            - MBTI, 혈액형 등 재미있는 성격 테스트
+카테고리별 특화 가이드:
 
-            형식:
-            제목: 간단하고 흥미로운 제목
-            내용: 2-4문장 정도의 본문과 질문
+**실시간 - 대학생 일상 TMI, 고민, 궁금한 것들, 학교생활, 취미, 트렌드**:
+- 일상 TMI, 고민, 궁금한 것들
+- 학교생활, 취미, 트렌드 관련
+- 예시: "과제 미루는 습관 어떻게 고치지", "요즘 인기 있는 게임 뭐예요?", "혼자 영화관 가는 거 어때요?"
 
-            응답은 다음 JSON 형식으로 해주세요:
-            {
-                "title": "게시글 제목",
-                "content": "게시글 내용"
-            }
-            """),
-            HumanMessage(content="주제 (선택사항): {topic}")
+**리뷰 - 실제 다녀온 데이트 장소, 맛집, 카페, 영화, 드라마 후기**:
+- 실제 다녀온 곳 후기 (구체적 장소명 포함)
+- 솔직한 경험담과 평가
+- 예시: "건대 ○○카페 분위기 진짜 좋네요", "어제 본 ○○ 영화 완전 꿀잼", "신촌 ○○ 맛집 인정합니다"
+
+**연애상담 - 썸 상황, 연애 고민, 소개팅 준비, 연락 빈도 등 현실적인 연애 상황**:
+- 진짜 고민 같은 상황 설정
+- 구체적이고 현실적인 연애 상황
+- 예시: "3개월째 썸인데 고백해도 될까요", "소개팅에서 뭘 입어야 할지 모르겠어요", "연락 빈도 어느 정도가 적당한가요?"
+
+작성 스타일:
+- 제목: 10-15자, 자연스럽고 클릭하고 싶게
+- 내용: 실제 대학생이 쓴 것처럼 자연스럽게 2-3문장
+- 반말 사용, 이모지 1-2개 적절히
+- 댓글 유도하는 질문으로 마무리
+- 너무 완벽하지 않게, 약간의 오타나 줄임말도 자연스럽게
+
+응답은 반드시 다음 JSON 형식으로만 해주세요:
+{{
+    "title": "게시글 제목",
+    "content": "게시글 내용"
+}}"""),
+            ("human", "다음 주제로 게시글을 작성해주세요: {topic}")
         ])
 
         self.post_chain = self.post_prompt | self.llm
@@ -159,23 +172,33 @@ class LLMService:
         result = await self.comment_chain.ainvoke({"feed_content": feed_content})
         return result.content
     
-    async def generate_post(self, topic: Optional[str] = None) -> Tuple[str, str]:
+    async def generate_post(self, article_type: Optional[str] = None) -> Tuple[str, str]:
         """
-        게시글을 생성합니다.
+        카테고리별 맞춤 게시글을 생성합니다.
 
         Args:
-            topic (Optional[str]): 게시글 주제 (선택사항)
+            article_type (Optional[str]): 게시글 타입 ('general', 'review', 'love-concerns')
 
         Returns:
             Tuple[str, str]: (제목, 내용)
         """
-        result = await self.post_chain.ainvoke({"topic": topic or "자유 주제"})
+        # 카테고리별 구체적인 주제 설정
+        topic_map = {
+            "general": "실시간 - 대학생 일상 TMI, 고민, 궁금한 것들, 학교생활, 취미, 트렌드",
+            "review": "리뷰 - 실제 다녀온 데이트 장소, 맛집, 카페, 영화, 드라마 후기",
+            "love-concerns": "연애상담 - 썸 상황, 연애 고민, 소개팅 준비, 연락 빈도 등 현실적인 연애 상황"
+        }
+
+        topic = topic_map.get(article_type, "대학생들의 자유로운 주제")
+        result = await self.post_chain.ainvoke({"topic": topic})
 
         try:
             parsed_result = json.loads(result.content)
             return parsed_result["title"], parsed_result["content"]
-        except:
-            # JSON 파싱 실패 시 기본값 반환
+        except Exception as e:
+            # JSON 파싱 실패 시 로그 출력 및 기본값 반환
+            logger.error(f"JSON 파싱 실패: {str(e)}")
+            logger.error(f"원본 응답: {result.content}")
             return "커뮤니티 질문", result.content
 
 # 전역 LLM 서비스 인스턴스

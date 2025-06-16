@@ -31,12 +31,16 @@ class Settings:
     # 외부 서비스 API 설정
     EXTERNAL_API_BASE_URL: str = os.getenv("EXTERNAL_API_BASE_URL", "")
     EXTERNAL_API_TOKEN: str = os.getenv("EXTERNAL_API_TOKEN", "")
+
+    # 개발모드 설정
+    DEV_MODE: bool = os.getenv("DEV_MODE", "True").lower() == "true"
+    DEV_USER_ID: str = os.getenv("DEV_USER_ID", "dev_user_id_for_testing")
     
-    # 스케줄링 설정
-    COMMENT_MIN_INTERVAL_MINUTES: int = int(os.getenv("COMMENT_MIN_INTERVAL_MINUTES", "30"))
-    COMMENT_MAX_INTERVAL_HOURS: int = int(os.getenv("COMMENT_MAX_INTERVAL_HOURS", "10"))
-    POST_MIN_INTERVAL_HOURS: int = int(os.getenv("POST_MIN_INTERVAL_HOURS", "24"))
-    POST_MAX_INTERVAL_HOURS: int = int(os.getenv("POST_MAX_INTERVAL_HOURS", "72"))
+    # 스케줄링 설정 (활발한 커뮤니티를 위한 짧은 간격)
+    COMMENT_MIN_INTERVAL_MINUTES: int = int(os.getenv("COMMENT_MIN_INTERVAL_MINUTES", "1"))   # 댓글: 1분
+    COMMENT_MAX_INTERVAL_HOURS: int = int(os.getenv("COMMENT_MAX_INTERVAL_HOURS", "1"))      # 댓글: 1시간
+    POST_MIN_INTERVAL_HOURS: int = int(os.getenv("POST_MIN_INTERVAL_HOURS", "0"))           # 게시글: 10분 (코드에서 직접 처리)
+    POST_MAX_INTERVAL_HOURS: int = int(os.getenv("POST_MAX_INTERVAL_HOURS", "2"))           # 게시글: 2시간
 
 # 전역 설정 인스턴스
 settings = Settings()

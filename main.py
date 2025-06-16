@@ -6,6 +6,7 @@ FastAPI를 사용하여 RESTful API를 제공합니다.
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from pydantic import BaseModel
 import uvicorn
 import logging
 
@@ -16,6 +17,7 @@ from models.schemas import (
 )
 from services.llm_service import llm_service
 from services.scheduler_service import scheduler_service
+from services.external_api_service import external_api_service, ArticleType
 from utils.random_generator import generate_comment_signature, generate_post_signature
 
 # 로깅 설정
@@ -201,6 +203,108 @@ async def stop_scheduler():
     except Exception as e:
         logger.error(f"스케줄러 중지 중 오류 발생: {str(e)}")
         raise HTTPException(status_code=500, detail="스케줄러 중지 중 오류가 발생했습니다.")
+
+@app.post("/scheduler/restart")
+async def restart_scheduler():
+    """스케줄러를 재시작하여 새로운 설정을 즉시 적용합니다."""
+    try:
+        # 스케줄러 재시작
+        scheduler_service.restart()
+        logger.info("새로운 설정으로 스케줄러를 재시작했습니다.")
+
+        return {
+            "message": "스케줄러가 새로운 설정으로 재시작되었습니다.",
+            "status": scheduler_service.get_status()
+        }
+    except Exception as e:
+        logger.error(f"스케줄러 재시작 중 오류 발생: {str(e)}")
+        raise HTTPException(status_code=500, detail="스케줄러 재시작 중 오류가 발생했습니다.")
+
+@app.post("/scheduler/trigger-post")
+async def trigger_post_now():
+    """즉시 게시글을 생성합니다."""
+    try:
+        await scheduler_service._generate_auto_post()
+        return {"message": "게시글이 즉시 생성되었습니다."}
+    except Exception as e:
+        logger.error(f"즉시 게시글 생성 중 오류 발생: {str(e)}")
+        raise HTTPException(status_code=500, detail="즉시 게시글 생성 중 오류가 발생했습니다.")
+
+@app.post("/scheduler/trigger-comment")
+async def trigger_comment_now():
+    """즉시 댓글을 생성합니다."""
+    try:
+        await scheduler_service._generate_auto_comment()
+        return {"message": "댓글이 즉시 생성되었습니다."}
+    except Exception as e:
+        logger.error(f"즉시 댓글 생성 중 오류 발생: {str(e)}")
+        raise HTTPException(status_code=500, detail="즉시 댓글 생성 중 오류가 발생했습니다.")
+
+# 외부 API 테스트 엔드포인트들
+@app.get("/external-api/articles")
+async def get_external_articles(category: str = "general"):
+    """외부 API에서 최근 게시글을 가져옵니다."""
+    try:
+        articles = await external_api_service.get_recent_articles(category, 5)
+        return {"articles": articles, "count": len(articles) if articles else 0}
+    except Exception as e:
+        logger.error(f"외부 게시글 조회 중 오류 발생: {str(e)}")
+        raise HTTPException(status_code=500, detail="외부 게시글 조회 중 오류가 발생했습니다.")
+
+@app.post("/external-api/test-comment")
+async def test_external_comment(article_id: str, content: str):
+    """외부 API 댓글 작성을 테스트합니다."""
+    try:
+        result = await external_api_service.create_comment(
+            article_id=article_id,
+            content=content,
+            anonymous=True
+        )
+        return {"success": result is not None, "result": result}
+    except Exception as e:
+        logger.error(f"외부 댓글 작성 테스트 중 오류 발생: {str(e)}")
+        raise HTTPException(status_code=500, detail="외부 댓글 작성 테스트 중 오류가 발생했습니다.")
+
+class TestArticleRequest(BaseModel):
+    title: str
+    content: str
+    article_type: str = "general"
+
+@app.post("/external-api/test-article")
+async def test_external_article(request: TestArticleRequest):
+    """외부 API 게시글 작성을 테스트합니다."""
+    try:
+        # 문자열을 ArticleType enum으로 변환
+        try:
+            type_enum = ArticleType(request.article_type)
+        except ValueError:
+            type_enum = ArticleType.GENERAL
+
+        result = await external_api_service.create_article(
+            title=request.title,
+            content=request.content,
+            article_type=type_enum,
+            anonymous=True
+        )
+        return {"success": result is not None, "result": result}
+    except Exception as e:
+        logger.error(f"외부 게시글 작성 테스트 중 오류 발생: {str(e)}")
+        raise HTTPException(status_code=500, detail="외부 게시글 작성 테스트 중 오류가 발생했습니다.")
+
+@app.get("/external-api/test-connection")
+async def test_external_connection():
+    """외부 API 연결 상태를 테스트합니다."""
+    try:
+        # 개발모드 상태 확인
+        return {
+            "dev_mode": settings.DEV_MODE,
+            "base_url": settings.EXTERNAL_API_BASE_URL,
+            "has_token": bool(settings.EXTERNAL_API_TOKEN),
+            "status": "ready"
+        }
+    except Exception as e:
+        logger.error(f"연결 테스트 중 오류 발생: {str(e)}")
+        raise HTTPException(status_code=500, detail="연결 테스트 중 오류가 발생했습니다.")
 
 if __name__ == "__main__":
     uvicorn.run(
