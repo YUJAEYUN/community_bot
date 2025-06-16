@@ -193,13 +193,45 @@ class LLMService:
         result = await self.post_chain.ainvoke({"topic": topic})
 
         try:
-            parsed_result = json.loads(result.content)
-            return parsed_result["title"], parsed_result["content"]
+            # JSON 파싱 시도
+            content = result.content.strip()
+
+            # 혹시 마크다운 코드 블록으로 감싸져 있다면 제거
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.startswith("```"):
+                content = content[3:]
+            if content.endswith("```"):
+                content = content[:-3]
+
+            content = content.strip()
+
+            parsed_result = json.loads(content)
+            title = parsed_result.get("title", "커뮤니티 질문")
+            post_content = parsed_result.get("content", "내용을 생성하지 못했습니다.")
+
+            logger.info(f"게시글 생성 성공 - 제목: {title}")
+            logger.info(f"게시글 생성 성공 - 내용: {post_content[:50]}...")
+
+            return title, post_content
+
         except Exception as e:
             # JSON 파싱 실패 시 로그 출력 및 기본값 반환
             logger.error(f"JSON 파싱 실패: {str(e)}")
             logger.error(f"원본 응답: {result.content}")
-            return "커뮤니티 질문", result.content
+
+            # 원본 응답에서 제목과 내용을 추출 시도
+            content = result.content
+            if '"title"' in content and '"content"' in content:
+                # 간단한 정규식으로 제목과 내용 추출 시도
+                import re
+                title_match = re.search(r'"title":\s*"([^"]+)"', content)
+                content_match = re.search(r'"content":\s*"([^"]+)"', content)
+
+                if title_match and content_match:
+                    return title_match.group(1), content_match.group(1)
+
+            return "커뮤니티 질문", "안녕하세요! 오늘 하루 어떻게 보내셨나요? 😊"
 
 # 전역 LLM 서비스 인스턴스
 llm_service = LLMService()

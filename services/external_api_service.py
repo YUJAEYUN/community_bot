@@ -211,6 +211,11 @@ class ExternalAPIService:
                     "anonymous": anonymous
                 }
 
+                # 디버깅: 전송할 데이터 로깅
+                logger.info(f"게시글 전송 데이터 - 제목: {title}")
+                logger.info(f"게시글 전송 데이터 - 내용: {content[:100]}...")
+                logger.info(f"게시글 전송 데이터 - 타입: {article_type.value}")
+
                 response = await client.post(
                     url,
                     json=payload,
