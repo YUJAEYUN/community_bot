@@ -4,9 +4,16 @@
 
 ## 프로젝트 개요
 
-이 프로젝트는 소개팅 앱 커뮤니티의 활성화를 위해 AI가 자동으로 댓글과 게시글을 생성하는 백엔드 서버입니다. LangChain을 활용하여 감성 분석을 통한 부정적 피드 필터링과 긍정적인 댓글/게시글 생성 기능을 제공합니다.
+이 프로젝트는 소개팅 앱 커뮤니티의 활성화를 위해 AI가 자동으로 댓글과 게시글을 생성하는 백엔드 서버입니다. LangChain을 활용하여 감성 분석을 통한 부정적 피드 필터링과 긍정적인 댓글/게시글 생성 기능을 제공하며, **RAG(Retrieval-Augmented Generation) 시스템**을 통해 실제 커뮤니티 데이터를 학습하여 더욱 자연스럽고 맥락에 맞는 콘텐츠를 생성합니다.
 
 ## 주요 기능
+
+### 🧠 RAG 기반 지능형 콘텐츠 생성
+- **커뮤니티 데이터 임베딩**: 실제 커뮤니티 글/댓글을 벡터 데이터베이스에 저장
+- **맥락 인식 검색**: 게시글과 댓글의 맥락을 파악하여 유사한 과거 데이터 검색
+- **퓨샷 학습**: 검색된 데이터를 LLM 컨텍스트에 추가하여 더 자연스러운 응답 생성
+- **수동 데이터 관리**: 새로운 트렌드와 유행어를 필요에 따라 수동으로 업데이트
+- **품질 향상**: 실제 사용자 어투, 감성, 문화를 반영한 '사람 같은' 콘텐츠
 
 ### 🤖 고도화된 AI 댓글 생성
 - **페르소나 기반 댓글**: 5가지 다양한 성격의 AI 페르소나가 자연스러운 댓글 생성
@@ -44,6 +51,9 @@
 
 - **백엔드**: FastAPI
 - **LLM**: LangChain + OpenAI GPT / Google Gemini
+- **RAG 시스템**: LangChain + Vector Database (Chroma/FAISS)
+- **임베딩**: OpenAI Embeddings / HuggingFace Embeddings
+- **벡터 검색**: 유사도 기반 의미 검색
 - **스케줄링**: APScheduler
 - **환경 관리**: python-dotenv
 
@@ -61,10 +71,19 @@ community_bot/
 ├── services/
 │   ├── __init__.py
 │   ├── llm_service.py     # LangChain LLM 서비스
-│   └── scheduler_service.py # 스케줄링 서비스
-└── utils/
-    ├── __init__.py
-    └── random_generator.py # 랜덤 닉네임/대학명 생성
+│   ├── rag_service.py     # RAG 시스템 서비스
+│   ├── embedding_service.py # 임베딩 및 벡터 DB 서비스
+│   ├── scheduler_service.py # 스케줄링 서비스
+│   └── external_api_service.py # 외부 API 연동
+├── utils/
+│   ├── __init__.py
+│   ├── random_generator.py # 랜덤 닉네임/대학명 생성
+│   └── data_processor.py  # 데이터 전처리 유틸리티
+├── data/
+│   ├── raw/               # 원본 커뮤니티 데이터
+│   ├── processed/         # 전처리된 데이터
+│   └── embeddings/        # 임베딩 벡터 저장소
+└── vector_db/             # 벡터 데이터베이스 저장소
 ```
 
 ## 🚀 설치 및 실행
@@ -95,6 +114,14 @@ OPENAI_API_KEY=your_openai_api_key_here
 # 외부 서비스 API 엔드포인트 (소개팅 서비스 백엔드)
 EXTERNAL_API_BASE_URL=http://localhost:8044/api
 EXTERNAL_API_TOKEN=your_jwt_token_here
+
+# RAG 시스템 설정
+VECTOR_DB_TYPE=chroma                # 벡터 DB 타입 (chroma/faiss)
+VECTOR_DB_PATH=./vector_db           # 벡터 DB 저장 경로
+EMBEDDING_MODEL=text-embedding-ada-002  # 임베딩 모델
+CHUNK_SIZE=500                       # 텍스트 청크 크기
+CHUNK_OVERLAP=50                     # 청크 오버랩 크기
+SIMILARITY_THRESHOLD=0.7             # 유사도 임계값
 
 # 스케줄링 설정
 COMMENT_MIN_INTERVAL_MINUTES=1       # 댓글: 최소 1분
@@ -177,6 +204,12 @@ pip install -r requirements.txt
 - `POST /generate-comment` - AI 댓글 생성
 - `POST /generate-post` - AI 게시글 생성
 
+### RAG 시스템 관리
+- `POST /rag/upload-data` - 커뮤니티 데이터 업로드 및 임베딩
+- `POST /rag/search` - 유사 콘텐츠 검색
+- `GET /rag/status` - RAG 시스템 상태 조회
+- `DELETE /rag/clear` - 벡터 DB 초기화
+
 ### 스케줄러 관리
 - `GET /scheduler/status` - 스케줄러 상태 조회
 - `POST /scheduler/start` - 스케줄러 시작
@@ -213,6 +246,11 @@ curl -X POST "http://localhost:8000/generate-comment" \
 curl -X POST "http://localhost:8000/generate-post" \
   -H "Content-Type: application/json" \
   -d '{"topic": "review"}'
+
+# RAG 시스템 테스트
+curl -X POST "http://localhost:8000/rag/search" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "카페 추천", "limit": 5}'
 ```
 
 ## 사용 예시
@@ -238,21 +276,33 @@ curl -X POST "http://localhost:8000/generate-post" \
 3. **AI 전용 엔드포인트**: 다양한 닉네임 생성을 위해 `/api/ai/content/` 엔드포인트를 사용합니다.
 4. **서비스 백엔드 연동**: 소개팅 서비스 백엔드가 실행 중이어야 정상 작동합니다.
 5. **스케줄링 간격**: 너무 짧은 간격 설정 시 API 호출 제한에 걸릴 수 있습니다.
+6. **RAG 데이터 관리**:
+   - 커뮤니티 데이터 수집 시 해당 서비스의 약관 및 정책을 준수하세요
+   - 개인정보가 포함된 데이터는 반드시 익명화 처리하세요
+   - 부적절한 콘텐츠는 사전에 필터링하여 업로드하세요
+7. **벡터 DB 용량**: 대량의 데이터 임베딩 시 충분한 저장 공간을 확보하세요.
+8. **임베딩 비용**: OpenAI Embeddings API 사용 시 토큰 사용량에 따른 비용이 발생합니다.
 
 ## 🔧 시스템 아키텍처
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Community     │    │   Dating App    │    │   OpenAI API    │
-│   Bot Server    │◄──►│   Backend       │    │                 │
-│   (FastAPI)     │    │   (Spring)      │    │   (GPT-4)       │
+│   Bot Server    │◄──►│   Backend       │    │   (GPT-4 +      │
+│   (FastAPI)     │    │   (Spring)      │    │   Embeddings)   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │
-         │                       │
-    ┌────▼────┐             ┌────▼────┐
-    │ AI 게시글 │             │ AI 댓글  │
-    │ 자동생성  │             │ 자동생성  │
-    └─────────┘             └─────────┘
+         │                       │                       │
+         │                       │                       │
+    ┌────▼────┐             ┌────▼────┐             ┌────▼────┐
+    │ AI 게시글 │             │ AI 댓글  │             │ RAG 시스템│
+    │ 자동생성  │             │ 자동생성  │             │ (벡터 DB) │
+    └─────────┘             └─────────┘             └─────────┘
+                                   │                       │
+                                   │                       │
+                              ┌────▼───────────────────────▼────┐
+                              │     맥락 인식 콘텐츠 생성        │
+                              │  (과거 데이터 기반 퓨샷 학습)    │
+                              └─────────────────────────────────┘
 ```
 
 ## 📊 현재 설정
@@ -261,8 +311,36 @@ curl -X POST "http://localhost:8000/generate-post" \
 - **게시글 생성**: 10분 ~ 2시간 간격
 - **AI 엔드포인트**: `/api/ai/content/articles`, `/api/ai/content/articles/{id}/comments`
 - **랜덤 닉네임**: 매번 다른 익명 사용자로 생성
+- **RAG 시스템**:
+  - 벡터 DB: Chroma (기본값)
+  - 임베딩 모델: text-embedding-ada-002
+  - 청크 크기: 500자
+  - 유사도 임계값: 0.7
 
 ## 🚀 고도화된 기능 상세
+
+### 🧠 RAG 시스템 (Retrieval-Augmented Generation)
+실제 커뮤니티 데이터를 활용하여 더욱 자연스럽고 맥락에 맞는 콘텐츠를 생성합니다.
+
+#### 작동 원리
+1. **데이터 수집**: 실제 커뮤니티 글/댓글 데이터를 수집
+2. **전처리**: 텍스트 정제, 청크 분할, 메타데이터 추출
+3. **임베딩**: OpenAI Embeddings를 사용하여 벡터화
+4. **저장**: Chroma/FAISS 벡터 데이터베이스에 저장
+5. **검색**: 새로운 콘텐츠 생성 시 유사한 과거 데이터 검색
+6. **생성**: 검색된 데이터를 컨텍스트로 활용하여 LLM 응답 생성
+
+#### 장점
+- **품질 향상**: 실제 사용자 어투, 유행어, 감성 반영
+- **일관성 유지**: 커뮤니티 특정 분위기와 문화 유지
+- **맥락 인식**: 게시글과 댓글 간의 관계 파악
+- **비용 효율성**: 웹 검색 대비 빠르고 저렴한 검색
+- **통제 가능성**: 특정 커뮤니티 데이터만 사용하여 품질 관리
+
+#### 데이터 관리
+- **수동 업데이트**: 새로운 트렌드나 유행어를 필요에 따라 추가
+- **품질 관리**: 부적절한 콘텐츠 필터링 및 정제
+- **버전 관리**: 데이터셋 변경 이력 추적
 
 ### 페르소나 시스템
 각 AI 페르소나는 고유한 성격, 말투, 관심사, 글쓰기 스타일을 가지고 있어 더욱 자연스럽고 다양한 응답을 생성합니다.
@@ -286,6 +364,40 @@ curl -X POST "http://localhost:8000/generate-post" \
 
 ## 개발 및 확장
 
+### RAG 데이터 관리
+
+#### 새로운 데이터 추가
+```bash
+# 1. 데이터 파일을 data/raw/ 디렉토리에 저장
+# 2. API를 통해 데이터 업로드 및 임베딩
+curl -X POST "http://localhost:8000/rag/upload-data" \
+  -H "Content-Type: application/json" \
+  -d '{"file_path": "data/raw/new_community_data.json"}'
+```
+
+#### 데이터 형식
+```json
+{
+  "posts": [
+    {
+      "id": "post_001",
+      "title": "게시글 제목",
+      "content": "게시글 내용",
+      "category": "general",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "comments": [
+    {
+      "id": "comment_001",
+      "post_id": "post_001",
+      "content": "댓글 내용",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
 ### 새로운 페르소나 추가
 ```python
 # services/llm_service.py의 PERSONAS 리스트에 추가
@@ -308,6 +420,7 @@ PersonaConfig(
 
 ### 커스터마이징
 - **새로운 LLM 모델**: `services/llm_service.py` 수정
+- **RAG 시스템**: `services/rag_service.py`, `services/embedding_service.py` 수정
 - **스케줄링 로직**: `services/scheduler_service.py` 수정
 - **API 엔드포인트**: `main.py` 수정
 - **프롬프트 튜닝**: 각 프롬프트 템플릿 수정
