@@ -27,6 +27,7 @@ class PersonaConfig(BaseModel):
     interests: List[str] = Field(description="관심사")
     writing_style: str = Field(description="글쓰기 스타일")
 
+# TODO: 서비스에 있는 프로필 정보로 맞춰서 페르소나 수정 필요(현재는 임시로 설정)
 # 다양한 페르소나 정의
 PERSONAS = [
     PersonaConfig(
@@ -75,10 +76,10 @@ class LLMService:
             return ChatOpenAI(
                 openai_api_key=settings.OPENAI_API_KEY,
                 model_name=settings.OPENAI_MODEL,
-                temperature=0.7
+                temperature=0.7 # TODO: 0.7이 적절한지 검토 필요, temperature값 높을수록 상상 많이함
             )
         else:
-            # Google Gemini 설정 (추후 구현)
+            # Google Gemini 설정 (llm별로 특화된게 달라서 추후 구현 해봐도..?)
             raise NotImplementedError("Google Gemini 연동은 추후 구현 예정입니다.")
     
     def _get_random_persona(self) -> PersonaConfig:
@@ -270,7 +271,7 @@ class LLMService:
                 confidence=0.0,
                 reason=f"분석 중 오류 발생: {str(e)}"
             )
-    
+    # TODO: 페르소나별 에이전트 세분화 필요. 현재 너무 많은걸 하나의 에이전트가 담당중
     async def generate_comment(self, feed_content: str) -> str:
         """
         페르소나 기반으로 자연스러운 댓글을 생성합니다.
@@ -358,6 +359,7 @@ class LLMService:
         ]
         return random.choice(fallback_comments)
     
+    # TODO: 페르소나별 에이전트 세분화 필요. 현재 너무 많은걸 하나의 에이전트가 담당중
     async def generate_post(self, article_type: Optional[str] = None) -> Tuple[str, str]:
         """
         페르소나 기반으로 자연스러운 게시글을 생성합니다.
