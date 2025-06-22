@@ -36,11 +36,11 @@ class Settings:
     DEV_MODE: bool = os.getenv("DEV_MODE", "True").lower() == "true"
     DEV_USER_ID: str = os.getenv("DEV_USER_ID", "dev_user_id_for_testing")
     
-    # 스케줄링 설정 (활발한 커뮤니티를 위한 짧은 간격)
-    COMMENT_MIN_INTERVAL_MINUTES: int = int(os.getenv("COMMENT_MIN_INTERVAL_MINUTES", "1"))   # 댓글: 1분
-    COMMENT_MAX_INTERVAL_HOURS: int = int(os.getenv("COMMENT_MAX_INTERVAL_HOURS", "1"))      # 댓글: 1시간
-    POST_MIN_INTERVAL_HOURS: int = int(os.getenv("POST_MIN_INTERVAL_HOURS", "0"))           # 게시글: 10분 (코드에서 직접 처리)
-    POST_MAX_INTERVAL_HOURS: int = int(os.getenv("POST_MAX_INTERVAL_HOURS", "2"))           # 게시글: 2시간
+    # 스케줄링 설정 (더 활발한 커뮤니티를 위한 짧은 간격)
+    COMMENT_MIN_INTERVAL_MINUTES: int = int(os.getenv("COMMENT_MIN_INTERVAL_MINUTES", "1"))   # 댓글: 최소 1분
+    COMMENT_MAX_INTERVAL_MINUTES: int = int(os.getenv("COMMENT_MAX_INTERVAL_MINUTES", "3"))   # 댓글: 최대 3분
+    POST_MIN_INTERVAL_MINUTES: int = int(os.getenv("POST_MIN_INTERVAL_MINUTES", "1"))        # 게시글: 최소 1분
+    POST_MAX_INTERVAL_MINUTES: int = int(os.getenv("POST_MAX_INTERVAL_MINUTES", "5"))        # 게시글: 최대 5분
 
 # 전역 설정 인스턴스
 settings = Settings()

@@ -123,11 +123,11 @@ CHUNK_SIZE=500                       # 텍스트 청크 크기
 CHUNK_OVERLAP=50                     # 청크 오버랩 크기
 SIMILARITY_THRESHOLD=0.7             # 유사도 임계값
 
-# 스케줄링 설정
+# 스케줄링 설정 (더 활발한 커뮤니티를 위한 짧은 간격)
 COMMENT_MIN_INTERVAL_MINUTES=1       # 댓글: 최소 1분
-COMMENT_MAX_INTERVAL_HOURS=1         # 댓글: 최대 1시간
-POST_MIN_INTERVAL_MINUTES=10         # 게시글: 최소 10분
-POST_MAX_INTERVAL_HOURS=2            # 게시글: 최대 2시간
+COMMENT_MAX_INTERVAL_MINUTES=3       # 댓글: 최대 3분
+POST_MIN_INTERVAL_MINUTES=1          # 게시글: 최소 1분
+POST_MAX_INTERVAL_MINUTES=5          # 게시글: 최대 5분
 
 # 개발 모드 설정
 DEV_MODE=false
@@ -273,9 +273,9 @@ curl -X POST "http://localhost:8000/generate-post" \
 
 1. **API 키 보안**: `.env` 파일의 API 키들을 안전하게 관리하세요.
 2. **부정적 피드 필터링**: 시스템이 자동으로 부정적인 피드를 감지하여 댓글 생성을 차단합니다.
-3. **AI 전용 엔드포인트**: 다양한 닉네임 생성을 위해 `/api/ai/content/` 엔드포인트를 사용합니다.
+3. **AI 전용 엔드포인트**: `/api/ai/content/` 엔드포인트를 사용하며, 작성자명은 메인 백엔드에서 자동 생성됩니다.
 4. **서비스 백엔드 연동**: 소개팅 서비스 백엔드가 실행 중이어야 정상 작동합니다.
-5. **스케줄링 간격**: 너무 짧은 간격 설정 시 API 호출 제한에 걸릴 수 있습니다.
+5. **스케줄링 간격**: 현재 매우 짧은 간격(댓글 1-3분, 게시글 1-5분)으로 설정되어 있어 API 호출량이 많습니다. 필요에 따라 간격을 조정하세요.
 6. **RAG 데이터 관리**:
    - 커뮤니티 데이터 수집 시 해당 서비스의 약관 및 정책을 준수하세요
    - 개인정보가 포함된 데이터는 반드시 익명화 처리하세요
@@ -307,10 +307,10 @@ curl -X POST "http://localhost:8000/generate-post" \
 
 ## 📊 현재 설정
 
-- **댓글 생성**: 1분 ~ 1시간 간격
-- **게시글 생성**: 10분 ~ 2시간 간격
+- **댓글 생성**: 1분 ~ 3분 간격 (더 활발한 커뮤니티)
+- **게시글 생성**: 1분 ~ 5분 간격 (더 활발한 커뮤니티)
 - **AI 엔드포인트**: `/api/ai/content/articles`, `/api/ai/content/articles/{id}/comments`
-- **랜덤 닉네임**: 매번 다른 익명 사용자로 생성
+- **작성자명**: 메인 백엔드에서 자동 생성 (AI 봇에서는 순수 콘텐츠만 생성)
 - **RAG 시스템**:
   - 벡터 DB: Chroma (기본값)
   - 임베딩 모델: text-embedding-ada-002

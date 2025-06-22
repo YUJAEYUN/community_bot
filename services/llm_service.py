@@ -6,7 +6,7 @@ LangChain을 활용한 고도화된 LLM 서비스
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 from typing import Tuple, Optional, List, Dict
 import json
 import logging
@@ -129,13 +129,13 @@ class LLMService:
 3. 커뮤니티 분위기에 미칠 영향 (10%)
 
 응답은 반드시 다음 JSON 형식으로만 해주세요:
-{{
+{{{{
     "is_positive": true,
     "confidence": 0.9,
     "reason": "판단 근거",
     "emotion": "감지된 주요 감정",
     "topic": "주요 주제"
-}}"""),
+}}}}"""),
             ("human", "분석할 피드 내용: {feed_content}")
         ])
 
@@ -207,10 +207,10 @@ class LLMService:
 - 연애상담: 현실적이고 공감 가능한 상황
 
 응답은 반드시 다음 JSON 형식으로만 해주세요:
-{{
+{{{{
     "title": "게시글 제목",
     "content": "게시글 내용"
-}}"""
+}}}}"""
     
     async def analyze_sentiment(self, feed_content: str) -> SentimentAnalysisResult:
         """

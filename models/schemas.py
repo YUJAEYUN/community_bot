@@ -21,7 +21,6 @@ class CommentRequest(BaseModel):
 class CommentResponse(BaseModel):
     """댓글 생성 응답 모델"""
     comment: str = Field(..., description="생성된 댓글")
-    author_name: str = Field(..., description="댓글 작성자명 (랜덤 생성)")
     is_positive: bool = Field(..., description="긍정적 피드 여부")
     created_at: datetime = Field(default_factory=datetime.now, description="생성 시간")
 
@@ -33,7 +32,6 @@ class PostResponse(BaseModel):
     """게시글 생성 응답 모델"""
     title: str = Field(..., description="게시글 제목")
     content: str = Field(..., description="게시글 내용")
-    author_name: str = Field(..., description="게시글 작성자명 (랜덤 생성)")
     created_at: datetime = Field(default_factory=datetime.now, description="생성 시간")
 
 class SentimentAnalysisResult(BaseModel):

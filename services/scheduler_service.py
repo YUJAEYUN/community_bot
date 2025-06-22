@@ -12,7 +12,7 @@ import random
 from config import settings
 from services.llm_service import llm_service
 from services.external_api_service import external_api_service, ArticleType
-from utils.random_generator import generate_comment_signature, generate_post_signature, get_random_interval_minutes
+from utils.random_generator import get_random_interval_minutes
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -67,14 +67,14 @@ class SchedulerService:
     
     def _schedule_next_comment(self):
         """다음 댓글 생성 스케줄링"""
-        # 랜덤 간격 계산 (30분 ~ 10시간)
-        interval_minutes = get_random_interval_minutes(
+        # 랜덤 간격 계산 (1분 ~ 3분)
+        interval_minutes = random.randint(
             settings.COMMENT_MIN_INTERVAL_MINUTES,
-            settings.COMMENT_MAX_INTERVAL_HOURS
+            settings.COMMENT_MAX_INTERVAL_MINUTES
         )
-        
+
         run_time = datetime.now() + timedelta(minutes=interval_minutes)
-        
+
         self.scheduler.add_job(
             self._generate_auto_comment,
             trigger='date',
@@ -82,18 +82,25 @@ class SchedulerService:
             id=f'auto_comment_{datetime.now().timestamp()}',
             replace_existing=True
         )
-        
-        logger.info(f"다음 댓글 생성이 {run_time.strftime('%Y-%m-%d %H:%M:%S')}에 예약되었습니다.")
+
+        logger.info(f"다음 댓글 생성이 {run_time.strftime('%Y-%m-%d %H:%M:%S')}에 예약되었습니다. (간격: {interval_minutes}분)")
     
     def _schedule_next_post(self):
         """다음 게시글 생성 스케줄링"""
-        # 랜덤 간격 계산 (10분 ~ 2시간)
-        min_minutes = 10  # 10분
-        max_minutes = settings.POST_MAX_INTERVAL_HOURS * 60  # 2시간 = 120분
+        # 랜덤 간격 계산 (1분 ~ 5분)
+        min_minutes = settings.POST_MIN_INTERVAL_MINUTES
+        max_minutes = settings.POST_MAX_INTERVAL_MINUTES
+
+        logger.info(f"게시글 스케줄링 설정 - 최소: {min_minutes}분, 최대: {max_minutes}분")
+
+        if min_minutes > max_minutes:
+            logger.error(f"잘못된 설정: 최소값({min_minutes})이 최대값({max_minutes})보다 큽니다. 기본값 사용.")
+            min_minutes, max_minutes = 1, 5
+
         interval_minutes = random.randint(min_minutes, max_minutes)
-        
+
         run_time = datetime.now() + timedelta(minutes=interval_minutes)
-        
+
         self.scheduler.add_job(
             self._generate_auto_post,
             trigger='date',
@@ -101,8 +108,8 @@ class SchedulerService:
             id=f'auto_post_{datetime.now().timestamp()}',
             replace_existing=True
         )
-        
-        logger.info(f"다음 게시글 생성이 {run_time.strftime('%Y-%m-%d %H:%M:%S')}에 예약되었습니다.")
+
+        logger.info(f"다음 게시글 생성이 {run_time.strftime('%Y-%m-%d %H:%M:%S')}에 예약되었습니다. (간격: {interval_minutes}분)")
     
     async def _generate_auto_comment(self):
         """자동 댓글 생성 및 전송"""

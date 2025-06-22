@@ -18,7 +18,7 @@ from models.schemas import (
 from services.llm_service import llm_service
 from services.scheduler_service import scheduler_service
 from services.external_api_service import external_api_service, ArticleType
-from utils.random_generator import generate_comment_signature, generate_post_signature
+# author_name은 메인 백엔드에서 자동 생성하므로 제거
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -109,16 +109,11 @@ async def generate_comment(request: CommentRequest):
                 detail=f"부정적인 피드로 판단되어 댓글을 생성하지 않습니다. 사유: {sentiment_result.reason}"
             )
         
-        # 댓글 생성
+        # 댓글 생성 (순수 댓글 내용만, author_name은 메인 백엔드에서 생성)
         comment = await llm_service.generate_comment(request.feed_content)
-        comment_with_signature = generate_comment_signature(comment)
-        
-        # 작성자명 추출 (서명에서)
-        author_name = comment_with_signature.split(" - ")[-1].replace(" 드림", "")
-        
+
         return CommentResponse(
-            comment=comment_with_signature,
-            author_name=author_name,
+            comment=comment,
             is_positive=sentiment_result.is_positive
         )
         
@@ -140,19 +135,12 @@ async def generate_post(request: PostRequest = PostRequest()):
         PostResponse: 생성된 게시글 정보
     """
     try:
-        # 게시글 생성
+        # 게시글 생성 (순수 제목과 내용만, author_name은 메인 백엔드에서 생성)
         title, content = await llm_service.generate_post(request.topic)
-        post_signature = generate_post_signature()
-        
-        full_content = f"{content}\n\n{post_signature}"
-        
-        # 작성자명 추출 (서명에서)
-        author_name = post_signature.replace("- ", "").replace(" 님의 질문", "")
-        
+
         return PostResponse(
             title=title,
-            content=full_content,
-            author_name=author_name
+            content=content
         )
         
     except Exception as e:
