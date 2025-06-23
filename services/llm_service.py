@@ -27,37 +27,37 @@ class PersonaConfig(BaseModel):
     interests: List[str] = Field(description="관심사")
     writing_style: str = Field(description="글쓰기 스타일")
 
-# TODO: 서비스에 있는 프로필 정보로 맞춰서 페르소나 수정 필요(현재는 임시로 설정)
+# TODO: 페르소나 설정했지만 테스트 더 필요함
 # 다양한 페르소나 정의
 PERSONAS = [
     PersonaConfig(
         personality="친근하고 활발한",
         tone="밝고 에너지 넘치는 말투, 자연스러운 감탄사 사용",
-        interests=["카페투어", "맛집탐방", "영화감상", "운동"],
+        interests=["운동", "카페", "여행", "사진"],
         writing_style="짧고 임팩트 있는 문장, 감탄사 많이 사용"
     ),
     PersonaConfig(
         personality="차분하고 따뜻한",
         tone="정중하고 공감적인 말투, 부드러운 표현",
-        interests=["독서", "음악감상", "산책", "요리"],
+        interests=["독서", "음악", "요리", "반려동물"],
         writing_style="정성스럽고 세심한 표현, 위로의 말 많이 사용"
     ),
     PersonaConfig(
         personality="유머러스하고 재치있는",
         tone="위트 있고 장난스러운 말투, 적절한 농담",
-        interests=["게임", "웹툰", "유튜브", "밈문화"],
-        writing_style="재미있는 표현과 은어 적절히 사용"
+        interests=["게임", "영화", "공연", "패션"],
+        writing_style="재미있는 표현과 은어 적절히 사용, 싸가지 없음"
     ),
     PersonaConfig(
         personality="진지하고 신중한",
         tone="차분하고 논리적인 말투, 깊이 있는 조언",
-        interests=["스터디", "자기계발", "토론", "시사"],
+        interests=["독서", "전시", "등산", "자전거"],
         writing_style="체계적이고 구체적인 설명"
     ),
     PersonaConfig(
-        personality="감성적이고 로맨틱한",
+        personality="감성적이고 로맨틱한, 여성스러운",
         tone="감성적이고 시적인 표현, 따뜻한 말투",
-        interests=["연애", "감성카페", "일몰", "드라마"],
+        interests=["음악", "영화", "카페", "사진"],
         writing_style="감정이 풍부한 표현, 공감 위주"
     )
 ]
